@@ -1,18 +1,14 @@
-# Flight Delay Risk Advisor
+Flight Delay Risk Advisor
 
-A Streamlit application that estimates whether a U.S. domestic flight will arrive **≥ 15 minutes late** and suggests **lower-risk alternatives** (time of day and airline) for the same route. The model is intentionally **interpretable** and the UI targets non-technical users.
+A Streamlit application that estimates whether a U.S. domestic flight will arrive ≥ 15 minutes late and suggests lower-risk alternatives (time of day and airline) for the same route. The model is intentionally interpretable, and the UI is designed for non-technical users.
 
-## Overview
+Overview
 
-- **Problem**: Travelers can’t easily translate historical performance into actionable choices.
-- **Goal**: Provide a per-flight **delay probability** and practical alternatives that reduce risk.
-- **Approach**: Train a logistic-regression pipeline on sampled U.S. DOT/BTS On-Time Performance data with well-understood features (route, carrier, month, weekday, departure hour, distance).
+• Problem: Historical delay statistics are hard to turn into concrete choices for a specific route, date, time, and carrier.
+• Goal: Provide a per-flight delay probability and practical, lower-risk alternatives that a traveler can act on.
+• Approach: Train an interpretable scikit-learn logistic-regression pipeline on a sampled portion of the U.S. DOT/BTS On-Time Performance dataset with well-understood features (route, carrier, month, weekday, departure hour, distance).
 
----
-
-## Screenshots
-
-> Replace file names below with yours. Place images under `assets/` in the repo and update paths.
+Screenshots
 
 - Prediction card  
   <img width="1781" height="857" alt="image" src="https://github.com/user-attachments/assets/6ced525e-5c92-4de9-b6df-c6aa26612acc" />
@@ -23,151 +19,87 @@ A Streamlit application that estimates whether a U.S. domestic flight will arriv
 - Safer options by airline  
   <img width="1776" height="646" alt="image" src="https://github.com/user-attachments/assets/7f468820-8271-4165-9f78-a23ae194ec8d" />
 
+How to Run (summary)
 
----
+Create and activate a Python virtual environment.
 
-## How to Run
+Install dependencies from requirements.txt.
 
-### Windows (PowerShell)
+Provide data by either placing a file named airline_2m.csv next to app.py or by setting the environment variable FLIGHTS_CSV to the full path of your dataset.
 
-```powershell
-# 1) Create and activate a virtual environment
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+Launch the app with Streamlit and open the local URL in your browser.
 
-# 2) Install dependencies
-pip install -r requirements.txt
-
-# 3) Point the app to your CSV
-# Option A: put airline_2m.csv next to app.py
-# Option B: set an environment variable to a custom path
-setx FLIGHTS_CSV "C:\path\to\airline_2m.csv"  # reopen terminal after setx
-# For the current shell only:
-# $env:FLIGHTS_CSV="C:\path\to\airline_2m.csv"
-
-# 4) Launch
-python -m streamlit run app.py
-macOS / Linux
-
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-# Optional: point to dataset
-export FLIGHTS_CSV="/path/to/airline_2m.csv"
-
-streamlit run app.py
-If no CSV is found, the app can operate in a small demo mode so reviewers can try it without large files.
+Large datasets and virtual environments are intentionally excluded from version control via .gitignore.
 
 Data
-Source: U.S. Bureau of Transportation Statistics (BTS) On-Time Performance dataset (1987–2020+).
 
-Target definition: ARR_DEL15 (1 if arrival delay ≥ 15 minutes, else 0). If not present, it is derived from arrival delay minutes.
+Source: U.S. Bureau of Transportation Statistics (BTS) On-Time Performance, 1987–2020+.
+Target definition: ARR_DEL15 equals 1 if arrival delay is at least 15 minutes, else 0. When ARR_DEL15 is missing, it is derived from available arrival delay fields when possible.
+Sampling: The app samples rows from the CSV to keep training fast on a laptop while preserving signal. The random seed is fixed for repeatability.
 
-Sampling: The app samples rows from the CSV for fast local training. This keeps training under a minute on a laptop while retaining signal.
+Features Used
 
-Large datasets (CSV) are intentionally excluded from git. The app uses FLIGHTS_CSV or a file named airline_2m.csv in the project folder.
+Origin (IATA)
+Destination (IATA)
+Operating carrier code (two letters)
+Month (1–12)
+Day of week (1–7)
+Scheduled departure hour (derived from HHMM)
+Distance (miles)
 
-Features
-All features are chosen for interpretability and availability across years:
-
-ORIGIN (IATA)
-
-DEST (IATA)
-
-OP_CARRIER (two-letter carrier code)
-
-MONTH (1–12)
-
-DAY_OF_WEEK (1–7)
-
-DEP_HOUR (derived from scheduled departure time)
-
-DISTANCE (miles)
-
-Categorical variables are one-hot encoded; numeric variables are imputed and scaled.
+Categorical features are one-hot encoded. Numeric features are imputed and scaled. Feature choices prioritize interpretability and broad availability across years.
 
 Model
-Algorithm: LogisticRegression (scikit-learn) with class_weight="balanced" to address class imbalance.
 
-Pipeline: ColumnTransformer for preprocessing → logistic regression.
+Algorithm: LogisticRegression with class_weight set to “balanced” to address class imbalance.
+Pipeline: ColumnTransformer for preprocessing followed by logistic regression.
+Split: Train/test split (for example, 80/20), with metrics reported on the held-out test set.
 
-Split: Train/validation split (e.g., 80/20). Metrics reported on held-out split.
-
-Rationale: Logistic regression is fast, robust, and yields calibrated probabilities that non-technical users can interpret.
+Rationale: Logistic regression is fast, robust, and provides calibrated probabilities that non-technical users can understand. The emphasis is decision support rather than leaderboard performance.
 
 Interpreting Results
-The app outputs:
 
-Estimated Delay Risk (e.g., 28.1%)
-Probability that the arrival delay will be ≥ 15 minutes for the given inputs.
-Interpretation: If an identical flight were taken many times under similar conditions, approximately that fraction would be delayed.
+Estimated delay risk (for example, 28.1%): The probability that the arrival delay will be at least 15 minutes for the given inputs. Interpreted over many comparable flights, roughly that fraction would be delayed.
 
-Status Label
+Status label: “Likely ON-TIME” or “Likely DELAYED,” based on a decision threshold (default 0.50). The threshold can be adjusted in an Advanced section if a more conservative or more liberal stance on delays is preferred.
 
-“Likely ON-TIME” or “Likely DELAYED” using a threshold (default 0.50).
+Internal test accuracy (for example, 80.2%): Accuracy on the held-out split of the sampled dataset. This is a global performance summary, not a guarantee for any single flight.
 
-The threshold can be adjusted in the “Advanced” expander if a user prefers a more conservative stance on delays.
+Safer options: The app shows lower-risk alternatives by time of day (departure windows) and by airline for the same route and time window, so a user can pivot to safer choices.
 
-Internal Test Accuracy (e.g., 80.2%)
-Accuracy on the held-out split of the sampled training data. This is overall performance, not a guarantee for any single flight.
+Why many cases may read ON-TIME: Delays are often the minority class; probabilities can cluster below 0.5 even with class balancing. Risk typically increases in winter months, on Friday/Sunday evenings, and on busy hub pairs.
 
-Safer Options
-
-By time of day: risk estimates for departure windows on the same route and airline.
-
-By airline: risk estimates for other carriers on the same route and time window.
-
-Notes:
-
-Delays are often the minority class; probabilities may cluster below 0.5. Winter months, Friday/Sunday evenings, and busy hubs typically produce higher risk.
-
-The model uses historical behavior only; it does not ingest live weather or operational constraints.
+Limitations: The model relies on historical behavior only. It does not incorporate live weather, crew constraints, or air traffic initiatives. Treat outputs as a risk advisor rather than a real-time delay prediction.
 
 Evaluation
-Metrics computed on the held-out test split:
 
-Accuracy: overall correctness of ON-TIME/DELAYED labels.
+Reported on the held-out test split:
+• Accuracy: overall correctness of ON-TIME versus DELAYED labels.
+• (Optional) Precision and Recall for the DELAYED class: helpful if prioritizing catching delays versus minimizing false alarms.
+• Calibration: logistic regression generally produces well-calibrated probabilities.
 
-(Optional) Precision/Recall for DELAYED: configurable in code; helpful when emphasizing catching delays vs. minimizing false alarms.
-
-Probability calibration: logistic regression provides probabilities that are generally well-calibrated.
-
-If you adjust the decision threshold in the UI, the label changes but the underlying probability does not.
+Changing the decision threshold alters the label but not the underlying probability.
 
 Reproducibility
-Dependencies: pinned in requirements.txt.
 
-Sampling: fixed random seed for repeatable subsamples.
-
-Portability: dataset path via environment variable or local file adjacent to app.py.
-
-Optional helper:
-
-make_sample.py can produce a small CSV sample for quick demos. This file is not required for normal operation.
+Dependencies are pinned in requirements.txt.
+Sampling uses a fixed random seed.
+The dataset path is provided via the environment variable FLIGHTS_CSV or by placing airline_2m.csv next to app.py.
+A small demo sample can be used to run the app without large files.
 
 Project Structure
 
-├─ app.py                      # Streamlit UI + training/inference pipeline
-├─ requirements.txt            # Dependencies
-├─ make_sample.py              # (optional) demo sampler
-├─ .streamlit/
-│   └─ config.toml             # Theme and layout
-├─ README.md
-└─ .gitignore                  # Excludes venv, large data, model artifacts
+app.py — Streamlit UI and training/inference pipeline
+requirements.txt — Dependencies
+make_sample.py — Optional sample generator for demos
+.streamlit/config.toml — Theme and layout
+README.md — This document
+.gitignore — Excludes large data, models, and virtual environments
 
-Limitations and Scope
-Historical data cannot capture day-of-travel disruptions (weather, ATC initiatives, crew legality, etc.).
+Roadmap
 
-Risk is route- and season-dependent; the model favors interpretability over complex feature interactions.
-
-Accuracy varies by route and time window; global accuracy is a summary metric.
-
-Roadmap (Selected)
-Add optional gradient-boosted trees with calibration and side-by-side metrics.
-
-Route-specific evaluation dashboards and reliability plots.
-
-Weather enrichment using historical station summaries.
-
-Exportable trip summary (PDF).
+Add an optional gradient-boosted model with calibration and side-by-side metrics.
+Provide route-specific dashboards and reliability plots.
+Enrich features with historical weather summaries.
+Export a shareable trip summary (PDF).
+Cache a small parquet sample for instant startup.
