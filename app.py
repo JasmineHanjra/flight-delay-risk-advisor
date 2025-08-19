@@ -1,4 +1,24 @@
-# Flight Delay Risk Advisor — polished UI for non-technical users
+"""
+Flight Delay Risk Advisor
+------------------------------------------------
+Streamlit app to estimate the chance that a US domestic flight
+arrives ≥15 minutes late and to suggest lower-risk alternatives
+(time-of-day, carrier). Built as a practical, end-user tool
+rather than an ML demo.
+
+Notes for reviewers / future maintainers:
+- Reads a large DOT BTS "On-Time Performance" CSV via robust sampling.
+- Features kept intentionally interpretable: origin, destination,
+  operating carrier, month, day of week, scheduled departure hour, distance.
+- Model: LogisticRegression inside a scikit-learn Pipeline, with
+  one-hot encoding for categoricals and class_weight="balanced" to
+  compensate for class imbalance.
+- UI avoids jargon; advanced knobs live in an expander.
+- If FLIGHTS_CSV env var is set, it points to the dataset; otherwise
+  the app looks for airline_2m.csv in the project folder.
+
+Author: Jasmine Hanjra, <June 2025>
+"""
 from __future__ import annotations
 import os
 from typing import Tuple, Dict, List
@@ -139,6 +159,27 @@ def load_data():
         return make_demo(6000), "Using small built-in demo data"
 
 def prepare_features(df_raw: pd.DataFrame):
+    """
+    Convert raw BTS rows into an interpretable feature matrix and labels.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Raw sample of the BTS On-Time CSV. Expected columns include
+        ORIGIN, DEST, OP_CARRIER, MONTH, DAY_OF_WEEK, CRS_DEP_TIME, DISTANCE,
+        and either ARR_DEL15 or ARR_DELAY.
+
+    Returns
+    -------
+    X : DataFrame
+        Model-ready features (categoricals not yet one-hot encoded).
+    y : Series
+        Binary label: 1 = delayed ≥15 min, 0 = on-time.
+    info : dict
+        Small metadata bundle used by the UI (e.g., category vocabularies).
+    """
+    #Subtlety: CRS_DEP_TIME is HHMM (e.g., 1735). We bucket by hour
+    # to reduce sparsity and reflect how travelers think
     df = normalize_bts_columns(df_raw)
     if "CANCELLED" in df.columns:
         df = df[df["CANCELLED"].fillna(0) == 0]
@@ -200,6 +241,13 @@ def prepare_features(df_raw: pd.DataFrame):
 
 @st.cache_resource(show_spinner=False)
 def train_model(X: pd.DataFrame, y: pd.Series) -> Pipeline:
+    """
+    Fit a compact, interpretable classifier.
+
+    Why logistic regression?
+    - Calibrated probabilities, fast to train on laptops, and plays nicely
+      with one-hot features. The goal is decision support, not leaderboard SOTA.
+    """
     if not X.columns.is_unique:
         dupes = [c for c in X.columns[X.columns.duplicated()]]
         raise ValueError(f"Non-unique columns in features: {dupes}")
