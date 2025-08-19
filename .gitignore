@@ -1,0 +1,26 @@
+# Virtual envs
+venv/
+.venv/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Streamlit cache & secrets
+.streamlit/cache/
+.streamlit/secrets.toml
+
+# Data & models (keep big files out of git)
+*.csv
+*.parquet
+*.pkl
+models/
+data/
+datasets/
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
